@@ -1,0 +1,354 @@
+---
+title: "Week 14 - Dimensionality Reduction"
+author: "Wilkister Mbaka"
+date: "2022-07-29"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **CarreFour Marketing - Dimensionality Reduction**
+
+## **Definining The Question**
+
+**Specifying the Question**
+
+1. This section of the project entails reducing your dataset to a low dimensional dataset using the t-SNE algorithm or PCA. 
+2. You will be required to perform your analysis and provide insights gained from your analysis.
+
+**Metric of success**
+
+- Importing the data
+- Cleaning the data 
+- performing a thorough EDA
+- Performing Dimensionality Reduction
+
+
+**Data relevance**
+
+The data has been provided by the supermarket itself
+
+
+**Understanding the context**
+
+You are a Data analyst at Carrefour Kenya and are currently undertaking a project that will inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). Your project has been divided into four parts where you'll explore a recent marketing dataset by performing various unsupervised learning techniques and later providing recommendations based on your insights.
+
+**Experimental design**
+
+The experimental design will involve the following steps:
+
+- Dealing with missing values. 
+- Dropping variables of low variance. 
+- Use of decision trees to tackle missing values, outliers and identifying significant variables. 
+- Use of random forest to select a smaller subset of input features. 
+- Using the Pearson correlation matrix to identify and later drop variables with high correlation. 
+- Performing backward feature elimination. 
+- Performing factor analysis to group high correlated variables. 
+- Using Principal Component Analysis (PCA).
+
+## **Reading The Data**
+
+```{r}
+# Importing Libraries
+library (tidyr)
+library(naniar)
+library (ggplot2)
+library (e1071)
+library (corrplot)
+library(factoextra)
+library(NbClust)
+library(superml)
+```
+
+``` {r}
+#installing packages
+library(data.table)
+#
+#Loading the dataset
+df <- fread("http://bit.ly/CarreFourDataset")
+```
+## **Checking The Data**
+
+```{r}
+# Preview the data
+head(df)
+```
+
+```{r}
+# Preview the data
+tail(df)
+```
+
+
+```{r}
+# Dimensionanity of the data
+dim(df)
+```
+The dataframe has 1000 rows and 16 columns
+
+
+## **Tidying The Dataset**
+```{r}
+# check the column names  
+colnames(df)
+
+# standardize column names with standard naming convention ie lowercase and replace spaces with '_'
+# replace the spaces with underscores using gsub() function
+names(df) <- gsub(" ","_", names(df))
+
+# The column names have a mixture of uppercase and lowercase charachers we should correct that and 
+#make all the characters lowercase.
+names(df) <- tolower(names(df))
+# Confirmation 
+colnames(df)
+```
+
+```{r}
+# Let us find the datatypes of the data
+str(df)
+```
+The dataset has character, integer and numerical datatypes
+Time and date are in the incorrect format
+
+```{r}
+# Change date to date format
+df$date <- as.Date(df$date, "%m/%d/%Y")
+
+# Change time to time format
+
+df$time <- as.ITime(df$time)
+
+head(df)
+```
+``` {r}
+#Finding the total number of missing values in each column
+colSums(is.na(df))
+```
+There are no missing values in the dataset
+
+
+```{r}
+# Cheking for duplicates
+df_dup <- df[duplicated(df),]
+df_dup
+```
+There is no duplicate data in this dataset
+
+**Checking for outliers**
+```{r}
+# Plotting boxplots to check for outliers
+boxplot(df$unit_price,col='grey', main = 'Unit Price')
+boxplot(df$quantity,col='grey', main = 'Quantity Boxplot')
+boxplot(df$tax,col='grey', main = 'Tax')
+boxplot(df$cogs,col='grey', main = 'Cogs')
+boxplot(df$gross_margin_percentage,col='grey', main = 'Gross Margin Percentage')
+boxplot(df$gross_income,col='grey', main = 'Gross Income')
+boxplot(df$rating,col='grey', main = 'Rating')
+boxplot(df$total,col='grey', main = 'Total')
+```
+Tax, Cogs, Gross Income, Total has some outliers but we will leave them because they are actual representation of the data
+
+## **Exploratory Data Analysis**
+
+### **Univariate Analysis**
+
+#### **Categorical Variables**
+
+```{r}
+# Frequency of categorical columns
+#Branch , customer_type, Gender, productline , payment
+branch <- table(df$branch)
+barplot(branch, col = "steelblue")
+customer_type_freq <- table (df$customer_type)
+barplot(customer_type_freq, col = "steelblue")
+gender <- table(df$gender)
+barplot(gender, col = "steelblue")
+product_line <- table(df$product_line)
+barplot(product_line, col = "steelblue")
+payment <- table(df$payment)
+barplot(payment, col = "steelblue")
+```
+From the bar plots above we can conclude that:
+- The data is collected on Branches A, B and C equally.
+- The information collected was half from the members and half from the normal customers. 
+- The gender was equally balances in the data.
+- Slightly More people paid their bills with E wallet and cash rather than Credit card
+
+```{r}
+ggplot(df, aes(fill=payment, y= payment, x=branch)) + 
+    geom_bar(position="dodge", stat="identity")
+```
+
+From the data, Ewallet payments are the most popular in all the three branches.
+
+```{r}
+ggplot(df, aes(fill=payment, y= payment, x=branch)) + 
+    geom_bar(position="dodge", stat="identity")
+```
+
+From the data, Ewallet payments are the most popular in all the three branches. 
+
+
+```{r}
+ggplot(df, aes(fill=product_line, y= product_line, x=branch)) + 
+    geom_bar(position="stack", stat="identity")
+```
+
+From the plot, Branch B sells more sports and travel goods than the other branches. 
+Branch A sells more home and lifestyle goods than the other branches. 
+Therefore, the marketing team should stack these branches with the product with which they sell more. 
+
+```{r}
+ggplot(df, aes(fill=gender, y= gender, x=branch)) + 
+    geom_bar(position="stack", stat="identity")
+```
+There are more males in the Carrefour branches than the females. This is not what many people assume as many people erroneously think that there are usually more females doing shopping. 
+
+Measures of central tendency for the numerical columns 
+```{r}
+# numerical columns. 
+num_col <- unlist(lapply(df, is.numeric))
+df_num <- subset(df, select = num_col)
+head (df_num)
+```
+
+```{r}
+#Getting the measures of dispersion in the numerical columns. 
+summary_stats <- data.frame(
+  Mean = apply(df_num, 2, mean), 
+  Median = apply(df_num, 2, median), 
+  Min = apply(df_num, 2, min),  
+  Max = apply(df_num, 2, max)) 
+summary_stats
+```
+
+
+```{r}
+# Define the function 
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+
+```{r}
+# Mode
+mode.unit_price <- getmode(df$unit_price)
+mode.unit_price
+mode.quantity <- getmode(df$quantity)
+mode.quantity
+mode.tax <- getmode(df$tax)
+mode.tax
+mode.cogs <- getmode(df$cogs)
+mode.cogs
+mode.gross_income <- getmode(df$gross_income)
+mode.gross_income
+mode.rating <- getmode(df$rating)
+mode.rating
+mode.total  <- getmode(df$total)
+mode.total
+```
+
+```{r}
+```
+
+
+```{r}
+# Label Encoder
+#Branch , customer_type, Gender, productline , payment
+lbl <- LabelEncoder$new()
+lbl$fit(df$branch)
+df$branch <- lbl$fit_transform(df$branch)
+lbl$fit(df$customer_type)
+df$customer_type <- lbl$fit_transform(df$customer_type)
+lbl$fit(df$gender)
+df$gender <- lbl$fit_transform(df$gender)
+lbl$fit(df$product_line)
+df$product_line <- lbl$fit_transform(df$product_line)
+lbl$fit(df$payment)
+df$payment <- lbl$fit_transform(df$payment)
+```
+
+```{r}
+str(df)
+```
+```{r}
+# Since the gross margin percentage has only one value we can drop the column. 
+table(df$gross_margin_percentage)
+df$gross_margin_percentage <- NULL
+```
+
+```{r}
+# Drop the categorcal columns 
+df$invoice_id <- NULL
+df$date <- NULL
+df$time <- NULL
+```
+
+```{r}
+# Separate the data 
+df.x <-  df[ , 1:11]
+df.y <-  df[, 12]
+```
+
+```{r}
+head(df.x)
+head(df.y)
+```
+
+```{r}
+# perform tsne
+library(Rtsne)
+tsne = Rtsne(df.x, dims = 2,  perplexity = 30)
+```
+
+```{r}
+#visualize TSNE
+df.tsne = data.frame(tsne$Y)  
+ggplot(df.tsne, aes(x=X1, y=X2)) + geom_point(size=2)
+```
+## Performing the PCA
+
+```{r}
+# Run the PCA on the df
+dfpca <- prcomp(t(df),center = TRUE, scale=TRUE) 
+## plot pc1 and pc2
+plot(dfpca$x[,1], dfpca$x[,2], main = "PCA1 & PCA2 values")
+```
+
+```{r}
+# Lets get a summary of the pca
+summary (dfpca)
+```
+```{r}
+## make a scree plot
+pca.var <- dfpca$sdev^2
+pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+barplot(pca.var.per, main="Scree Plot", xlab="Principal Component", ylab="Percent Variation")
+```
+
+
+```{r}
+## plot that shows the PCs and the variation:
+pca.data <- data.frame(Sample=rownames(dfpca$x),
+                       X=dfpca$x[,1],
+                       Y=dfpca$x[,2])
+pca.data
+ggplot(data=pca.data, aes(x=X, y=Y, label=Sample)) +
+  geom_text() +
+  xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
+  ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
+  theme_bw() +
+  ggtitle("Customer Data PCA Graph")
+```
+PC1 explains 96.5% of the total variance, which means that nearly 96% 
+ of the information in the dataset (11 variables) can be encapsulated 
+ by just that one Principal Component. PC2 explains 3.3% of the variance. etc
+```{r}
+library(ggbiplot)
+ggbiplot (prcomp(df))
+```
