@@ -1,0 +1,310 @@
+---
+title: "Part 3"
+author: "Wilkister Mbaka"
+date: "2022-07-30"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Part 3: Association Rules
+
+### **Specifying the Question**
+
+- Create association rules that will allow you to identify relationships between variables in the dataset. 
+- Provide insights for your analysis.
+
+```{r}
+# Load Package
+library(arules)
+```
+
+## Reading the Data
+```{r}
+# Load Dataset
+path <- "http://bit.ly/SupermarketDatasetII"
+trans<-read.transactions(path, sep = ",")
+trans
+```
+## Checking the Data
+
+```{r}
+# check info on the data
+trans
+```
+
+```{r}
+# verifying the object class
+class(trans)
+```
+
+```{r}
+# Previewing our first 5 transactions
+inspect(trans[1:5])
+```
+
+```{r}
+# preview the items that make up our dataset,
+# alternatively we can do the following
+# ---
+# 
+items<-as.data.frame(itemLabels(trans))
+colnames(items) <- "Item"
+head(items, 10)
+```
+
+```{r}
+# Generating a summary of the transaction dataset
+# ---
+# This would give us some information such as the most purchased items, 
+# distribution of the item sets (no. of items purchased in each transaction), etc.
+summary(trans)
+```
+The top 5 most frequently bought items are mineral water, eggs, spaghetti, french fries and chocolate
+
+```{r}
+# Plot bar charts to visualize the frequencies of the most frequent items
+# options(repr.plot.width = 15, repr.plot.height = 8)
+
+par(mfrow = c(1, 2))
+
+# plot the frequency of items
+itemFrequencyPlot(trans, topN = 10,col="lightblue", main = "Frequency Plot for Top Ten Items")
+itemFrequencyPlot(trans, support = 0.1,col="lightgray", main = "Items With At Least Ten Percent Frequency ")
+```
+```{r}
+# find the 10 least popular items
+least_items = itemFrequency(trans, type = "relative")
+head(sort(least_items), 10)
+```
+The top 5 least frequently bought items are water spray, napkins, cream, bramble and tea
+
+**Building a Model**
+```{r}
+# Building a model based on association rules 
+# We use Min Support as 0.001 and confidence as 0.8
+rules <- apriori (trans, parameter = list(supp = 0.001, conf = 0.8))
+rules
+```
+Using a confidence level of 0.80 and support of 0.001 we have a model with 74 rules. 
+An increase in minimum support will result in a decrease in the number of rules by the model. 
+However, a slight decrease in the confidence level will result in a huge increase in the rules created by the models.
+
+```{r}
+# Lets get more information on the rules formed
+# More statistical information such as support, lift and confidence is also provided.
+# ---
+# 
+summary(rules)
+```
+The set of 74 rules  has a maximum rule length of 6 and a minimum of 3. 
+
+```{r}
+# lets take a peek at the first 5 rules of the associative model formed. 
+inspect(rules[1:10])
+```
+The interpretation of this will require the understanding of several words. 
+- Support -> How popular an itemset is, as measured by the proportion of transactions in which an itemset appears. 
+- Confidence -> How often one item A appears whenever another item B appears in a transaction. This is usually a conditional probability.
+- Lift -> A rule with a lift of > 1 it would imply that those two occurrences are dependent on one another and useful for predicting.
+
+Thus in the 5th rule with a confidence level ~ 0.95 means that it is very likely that these three items are bought together by every customer. 
+
+The results reveal that the model is 95% confident that aperson buying mushroom cream sauce and pasta will buy escalope, 75% confident that a person buying milk and pasta will buy shrimp, etc,.
+
+```{r}
+# So lets sort the rules by the conficence levels to see the items are mostly bought together
+rules<-sort(rules, by="confidence", decreasing=TRUE)
+inspect(rules[1:10])
+```
+
+The following rules with a confidence level of 1 means that the items are almost always bought in that combination. Therefore, the marketing division would have to find a way to create promotions on these items. 
+
+There are 4 rules with 100% confidence
+
+For instance, a promotion campaign would be like buy french fries and get 50 percent off on Mushroom cream sauce. 
+
+```{r}
+# If we're interested in making a promotion relating to the sale of shrimp, 
+# we could create a subset of rules concerning these products 
+# This would tell us the items that the customers bought before purchasing shrimp
+
+# If we wanted to determine the items that customers buying shrimps might buy 
+
+# Subset the rules
+shrimp <- subset(rules, subset = lhs %pin% "shrimp")
+
+# Order by confidence
+shrimp<-sort(shrimp, by="confidence", decreasing=TRUE)
+
+# inspect top 5
+inspect(shrimp[1:5])
+
+```
+**Recommendations**
+Shrimps could be bundled up with cake, olive oil, or with light cream, mineral water, etc, during the promotion season
+
+
+# Part 4: Anomaly Detection
+
+### **Specifying the Question**
+
+- Check whether there are any anomalies in the given sales dataset. The objective of this task being fraud detection.
+
+```{r}
+# Load tidyverse and anomalize
+# ---
+# 
+library(tidyverse)
+library(anomalize)
+library(tibbletime)
+library(timetk)
+```
+
+
+```{r}
+# load data and convert it to as_tbl_time
+anom <- read.csv('http://bit.ly/CarreFourSalesDataset')
+head(anom)   
+```
+First we have to format the Date column as date attribute. 
+```{r}
+# conversion to date
+anom$Date <- as.Date(anom$Date , format = "%m/%d/%y")
+head(anom)
+```
+```{r}
+# Check dimensionality of the data
+dim(anom)
+
+```
+
+There are 1000 rows and 2 columns in the dataset
+
+```{r}
+# Check for duplicates in the dataset
+anyDuplicated(anom)
+```
+There are no duplicates in the dataset
+
+```{r}
+# Check for missing values
+colSums(is.na(anom))
+
+```
+There are no missing values in the dataset
+
+```{r}
+# Plotting boxplots to check for outliers
+boxplot(anom$Sales,col='grey', main = 'Sales  Boxplot')
+
+# display the number of outlier values in the column
+outlier_sales <- boxplot.stats(anom$Sales)$out
+mtext(paste("Outliers: ", paste(length(outlier_sales), collapse=", ")), cex=0.6)
+```
+There are 9 outliers. We will not be dropping the outliers because they represent actual goods sold
+
+```{r}
+# check for anomalies in the 'branch' column by scrutinizing its unique values 
+print(unique(anom$Date))
+```
+There are no anomalies in the date column
+
+# Univariate Analysis
+
+```{r}
+# identify numerical variables in the data1frame
+nums <- unlist(lapply(anom, is.numeric))
+
+# create a subset that contains the numerical variables
+numerics <- subset(anom, select=nums)
+```
+
+```{r}
+# compute the measures of cenral tendancy and the measures of dispersion of the numerical variables and contain them in a data1frame
+library(moments)
+
+statistics <- data.frame(
+  Mean = apply(numerics, 2, mean), 
+  Median = apply(numerics, 2, median), 
+  Min = apply(numerics, 2, min),  
+  Max = apply(numerics, 2, max),    
+  Variance= apply(numerics, 2, var),  
+  Std = apply(numerics, 2, sd),
+  Skewness = apply(numerics, 2, skewness), 
+  Kurtosis = apply(numerics, 2, kurtosis)) 
+
+# round off the values to 2 decimal places and display the data1frame
+statistics <- round(statistics, 2)
+statistics
+```
+
+```{r}
+hist(anom$Sales, main = 'Histogram of Sales column',col="lightblue")
+
+```
+The data is left skewed and as the amount of sales increases the amount of goods bought reduces
+
+```{r}
+# Check the range of dates of our dataset 
+paste(c('Earliest:'), min(anom$Date))
+paste(c('Latest:'), max(anom$Date))
+```
+The dataset has data from January 1st 2020 to March 30th 2020. So three months of data.
+
+```{r}
+# Check the range of Sales of our dataset 
+paste(c('Earliest:'), min(anom$Sales))
+paste(c('Latest:'), max(anom$Sales))
+```
+The minimum sales is 10.67 and the maximum sale is 1042.65
+
+```{r fig.height=5, fig.width=5}
+#Plotting the data
+library(ggplot2)
+ggplot(anom, aes(x=Date, y=Sales, color=Sales)) + geom_line()
+
+```
+
+
+**Anomaly Detection**
+
+First lets convert the df to a different format. 
+```{r}
+# sort the table in ascending order of 'date'
+anom  = anom[order(anom$Date),]  
+
+# convert dataset to tibble
+anomX <- as_tbl_time(anom, Date)
+class(anomX)
+plot (anomX)
+```
+
+```{r}
+# install.packages("devtools")
+# devtools::install_github("twitter/AnomalyDetection")
+library(AnomalyDetection)
+```
+
+```{r}
+sales_an <- AnomalyDetectionVec (x = anomX$Sales,period = 3 , direction= "both", plot = TRUE)
+sales_an
+```
+
+
+
+```{r}
+# Anomalize 
+# anomX %>%
+#    time_decompose(dates) %>%
+#    anomalize(remainder) %>%
+#    time_recompose() %>%
+#    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.5)
+```
+
+
+# Conclusions
+The data provided was accurate and more than sufficient to perform all the analysis that was initially intended for the project. 
+The marketing team will find insight and leads on various topics such as:
+- product distribution.
+- marketing strategies and much more
