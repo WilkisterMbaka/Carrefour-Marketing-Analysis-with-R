@@ -152,6 +152,14 @@ boxplot(df$total,col='grey', main = 'Total')
 ```
 Tax, Cogs, Gross Income, Total has some outliers but we will leave them because they are actual representation of the data
 
+```{r}
+# removing irrelevant column - gross_margin_percentage it has the same amount through out
+setDT(df)[, c( 'gross_margin_percentage') := NULL]
+# check the dimensions of the dataframe after cleaning
+dim(df)
+```
+
+
 ## **Exploratory Data Analysis**
 
 ### **Univariate Analysis**
@@ -159,56 +167,47 @@ Tax, Cogs, Gross Income, Total has some outliers but we will leave them because 
 #### **Categorical Variables**
 
 ```{r}
-# Frequency of categorical columns
-#Branch , customer_type, Gender, productline , payment
-branch <- table(df$branch)
-barplot(branch, col = "steelblue")
-customer_type_freq <- table (df$customer_type)
-barplot(customer_type_freq, col = "steelblue")
-gender <- table(df$gender)
-barplot(gender, col = "steelblue")
-product_line <- table(df$product_line)
-barplot(product_line, col = "steelblue")
-payment <- table(df$payment)
-barplot(payment, col = "steelblue")
+# Frequency of Branch column
+
+ggplot(df, aes(x = branch)) +
+  geom_bar(fill="blue") +  ggtitle('Barplot of Branch')
+
 ```
-From the bar plots above we can conclude that:
-- The data is collected on Branches A, B and C equally.
-- The information collected was half from the members and half from the normal customers. 
-- The gender was equally balances in the data.
-- Slightly More people paid their bills with E wallet and cash rather than Credit card
+The data collected on Branches A is slightly more than branch B and C .
 
 ```{r}
-ggplot(df, aes(fill=payment, y= payment, x=branch)) + 
-    geom_bar(position="dodge", stat="identity")
-```
+# Frequency of Customer Type column
 
-From the data, Ewallet payments are the most popular in all the three branches.
+ggplot(df, aes(x = customer_type)) +
+  geom_bar(fill="blue") +  ggtitle('Barplot of Customer Type')
+```
+The information collected was half from the members and half from the normal customers. 
 
 ```{r}
-ggplot(df, aes(fill=payment, y= payment, x=branch)) + 
-    geom_bar(position="dodge", stat="identity")
+# Frequency of Gender column
+
+ggplot(df, aes(x = gender)) +
+  geom_bar(fill="blue") +  ggtitle('Barplot of Gender')
 ```
+The data from male and female persons is equal
 
-From the data, Ewallet payments are the most popular in all the three branches. 
+```{r fig.height=3, fig.width=6.4}
+# Frequency of Product Line column
 
+ggplot(df, aes(x = product_line)) +
+  geom_bar(fill="blue") +  ggtitle('Barplot of Product Line')
+```
+The most popular product line is Fashion accessories followed by food and beverages
 
 ```{r}
-ggplot(df, aes(fill=product_line, y= product_line, x=branch)) + 
-    geom_bar(position="stack", stat="identity")
+# Frequency of Payment column
+
+ggplot(df, aes(x = payment)) +
+  geom_bar(fill="blue") +  ggtitle('Barplot of Payment')
 ```
+Slightly More people paid their bills with E wallet and cash rather than Credit card
 
-From the plot, Branch B sells more sports and travel goods than the other branches. 
-Branch A sells more home and lifestyle goods than the other branches. 
-Therefore, the marketing team should stack these branches with the product with which they sell more. 
-
-```{r}
-ggplot(df, aes(fill=gender, y= gender, x=branch)) + 
-    geom_bar(position="stack", stat="identity")
-```
-There are more males in the Carrefour branches than the females. This is not what many people assume as many people erroneously think that there are usually more females doing shopping. 
-
-Measures of central tendency for the numerical columns 
+#### **Numerical Variables** 
 ```{r}
 # numerical columns. 
 num_col <- unlist(lapply(df, is.numeric))
@@ -226,6 +225,18 @@ summary_stats <- data.frame(
 summary_stats
 ```
 
+```{r}
+# compute the measures of cenral tendancy and the measures of dispersion of the numerical variables and contain them in a data1frame
+library(moments)
+statistics <- data.frame(
+Variance= apply(df_num, 2, var),
+Std = apply(df_num, 2, sd),
+Skewness = apply(df_num, 2, skewness),
+Kurtosis = apply(df_num, 2, kurtosis))
+# round off the values to 2 decimal places and display the data1frame
+statistics <- round(statistics, 2)
+statistics
+```
 
 ```{r}
 # Define the function 
@@ -233,9 +244,7 @@ getmode <- function(v) {
   uniqv <- unique(v)
   uniqv[which.max(tabulate(match(v, uniqv)))]
 }
-```
 
-```{r}
 # Mode
 mode.unit_price <- getmode(df$unit_price)
 mode.unit_price
@@ -253,10 +262,169 @@ mode.total  <- getmode(df$total)
 mode.total
 ```
 
+**Histograms for Numerical Variables**
 ```{r}
+# plot a histogram to visualize the distribution of values in 'Unit Price' column
+hist(df$unit_price,
+    col="#660033",
+    main="Histogram to Show Count of Unit Price",
+    xlab="Unit Price",
+    ylab="Frequency",
+    labels=TRUE)
+```
+More items have a unit price of 90 - 100
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'Quantity' column
+hist(df$quantity,
+    col="#660033",
+    main="Histogram to Show Count of Quantity",
+    xlab="Quantity",
+    ylab="Frequency",
+    labels=TRUE)
+```
+Most customers bought 1 item at a time
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'Tax' column
+hist(df$tax,
+    col="#660033",
+    main="Histogram to Show Count of Tax",
+    xlab="Tax",
+    ylab="Frequency",
+    labels=TRUE)
+```
+The tax bracket 0 - 5 had a higher number of items 
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'Cogs' column
+hist(df$cogs,
+    col="#660033",
+    main="Histogram to Show Count of Cogs",
+    xlab="Cogs",
+    ylab="Frequency",
+    labels=TRUE)
+```
+Cogs (Cost of goods sold) The items cost bracket of 0 - 100 has the higher amount of items
+
+Tax and Cogs have a similar histogram
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'Gross Income' column
+
+hist(df$gross_income,
+    col="#660033",
+    main="Histogram to Show Count of Gross Income",
+    xlab="Gross Income",
+    ylab="Frequency",
+    labels=TRUE)
+```
+Gross Income, Tax and Cogs have a similar histogram
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'Rating' column
+
+hist(df$rating,
+    col="#660033",
+    main="Histogram to Show Count of Rating",
+    xlab="Rating",
+    ylab="Frequency",
+    labels=TRUE)
+```
+The rating 4 - 4.5 had higher amount of items than other rating brackets
+
+```{r}
+# plot a histogram to visualize the distribution of values in 'total' column
+
+hist(df$total,
+    col="#660033",
+    main="Histogram to Show Count of Total",
+    xlab="Total",
+    ylab="Frequency",
+    labels=TRUE)
+```
+A higher number of items fell into the total price bracket 0 - 100
+
+
+## **Bivariate Analysis**
+
+**Payment method frequency in every branch**
+```{r}
+# Create barplot
+
+ggplot(df, aes(fill=payment, x=branch)) +
+    geom_bar(position="stack")
+```
+Most popular method of payment in Branch A is E-wallet
+
+Most popular method of payment in Branch B is E-wallet but the other 2 modes of payment are also popular
+
+Most popular method of payment in Branch B is Cash
+
+
+**Product line Frequency in every branch**
+```{r}
+# Create Barplot
+
+ggplot(df, aes(fill=product_line, x=branch)) +
+    geom_bar(position="dodge")
 ```
 
+From the plot, Branch B sells more sports & travel and Health & Beauty goods than the other branches. 
+Branch A sells more home and lifestyle goods than the other branches. 
+Branch c sells more Food & Beverages, Fashion Accessories and Electronic accessories than the other branches
+Therefore, the marketing team should stack these branches with the product with which they sell more. 
 
+**Gender Frequency in every branch**
+```{r}
+ggplot(df, aes(fill=gender, x=branch)) + 
+    geom_bar(position="dodge")
+```
+There are more males in the Carrefour branches A and B than the females. This is not what many people assume as many people erroneously think that there are usually more females doing shopping. 
+In branch C, there are more females shopping than males
+```{r}
+head(df)
+```
+
+**Mean Rating for items every branch**
+```{r}
+# calculate mean rating for each branch
+library(dplyr)
+plotdata <- df %>%
+  group_by(branch) %>%
+  summarize(mean_rating = mean(rating))
+
+# plot mean salaries
+ggplot(plotdata, aes(x = branch, y = mean_rating)) +
+  geom_bar(stat = "identity", fill = "cornflowerblue") +
+  geom_text(aes(label = round(mean_rating,2)), 
+            vjust = -0.25)
+```
+Branch C has a higher mean rating of the product line items than the other branches
+
+**Mean Rating for items in every product line **
+```{r}
+# calculate mean rating for each product line
+library(dplyr)
+plotdata1 <- df %>%
+  group_by(product_line) %>%
+  summarize(mean_rating = mean(rating))
+
+# plot mean salaries
+ggplot(plotdata1, aes(x = product_line, y = mean_rating)) +
+  geom_bar(stat = "identity", fill = "cornflowerblue") +
+  geom_text(aes(label = round(mean_rating,2)), 
+            vjust = -0.25)
+```
+Food and Beverages has the highest rating and Home & Lifestyle has the least rating
+
+```{r}
+# calculate correlations
+correlations <- cor(df_num)
+# create correlation plot
+corrplot(correlations, method="number")
+```
+Gross income, tax, cogs and total have a correlation of 1 because they are calculated from from the same starting point (Cogs) and with the same fractions for tax, gross income and total.
 ```{r}
 # Label Encoder
 #Branch , customer_type, Gender, productline , payment
