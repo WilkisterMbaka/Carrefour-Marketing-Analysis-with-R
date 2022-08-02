@@ -425,10 +425,16 @@ correlations <- cor(df_num)
 corrplot(correlations, method="number")
 ```
 Gross income, tax, cogs and total have a correlation of 1 because they are calculated from from the same starting point (Cogs) and with the same fractions for tax, gross income and total.
+
+
 ```{r}
+# Make a copy of the df
+df_copy <- df
+
 # Label Encoder
 #Branch , customer_type, Gender, productline , payment
 lbl <- LabelEncoder$new()
+
 lbl$fit(df$branch)
 df$branch <- lbl$fit_transform(df$branch)
 lbl$fit(df$customer_type)
@@ -440,16 +446,6 @@ df$product_line <- lbl$fit_transform(df$product_line)
 lbl$fit(df$payment)
 df$payment <- lbl$fit_transform(df$payment)
 ```
-
-```{r}
-str(df)
-```
-```{r}
-# Since the gross margin percentage has only one value we can drop the column. 
-table(df$gross_margin_percentage)
-df$gross_margin_percentage <- NULL
-```
-
 ```{r}
 # Drop the categorcal columns 
 df$invoice_id <- NULL
@@ -458,32 +454,14 @@ df$time <- NULL
 ```
 
 ```{r}
-# Separate the data 
-df.x <-  df[ , 1:11]
-df.y <-  df[, 12]
+str(df)
 ```
 
-```{r}
-head(df.x)
-head(df.y)
-```
-
-```{r}
-# perform tsne
-library(Rtsne)
-tsne = Rtsne(df.x, dims = 2,  perplexity = 30)
-```
-
-```{r}
-#visualize TSNE
-df.tsne = data.frame(tsne$Y)  
-ggplot(df.tsne, aes(x=X1, y=X2)) + geom_point(size=2)
-```
 ## Performing the PCA
 
 ```{r}
-# Run the PCA on the df
-dfpca <- prcomp(t(df),center = TRUE, scale=TRUE) 
+# # Run the PCA on the df
+dfpca <- prcomp(t(df),center = TRUE, scale=TRUE)
 ## plot pc1 and pc2
 plot(dfpca$x[,1], dfpca$x[,2], main = "PCA1 & PCA2 values")
 ```
@@ -520,3 +498,140 @@ PC1 explains 96.5% of the total variance, which means that nearly 96%
 library(ggbiplot)
 ggbiplot (prcomp(df))
 ```
+
+# Part 2: Feature Selection
+
+## using the filter method.
+```{r}
+# Installing and loading our caret package
+suppressWarnings(
+        suppressMessages(if
+                         (!require(caret, quietly=TRUE))
+                install.packages("caret")))
+library(caret)
+```
+
+
+```{r}
+# Installing and loading the corrplot package for plotting
+# ---
+# 
+suppressWarnings(
+        suppressMessages(if
+                         (!require(corrplot, quietly=TRUE))
+                install.packages("corrplot")))
+library(corrplot)
+```
+
+```{r}
+# Calculating the correlation matrix
+correlationMatrix <- cor(df)
+# Find attributes that are highly correlated
+# ---
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
+highlyCorrelated
+```
+
+```{r}
+correlationMatrix
+```
+
+```{r}
+# Names of highly correlations
+names (df[, 7])
+names (df[, 9])
+names (df[, 11])
+```
+
+```{r}
+# Next step is removing the variables with high correlation 
+df_low <- df[-highlyCorrelated]
+df_low$tax <- NULL
+df_low$cogs <- NULL
+df_low$gross_income <- NULL
+```
+
+```{r}
+cor2 <- cor(df_low)
+cor2
+```
+
+
+```{r}
+# Performing our graphical comparison
+# ---
+# 
+library(stats)
+par(mfrow = c(1, 2))
+corrplot(correlationMatrix, order = "hclust")
+corrplot(cor(df_low), order = "hclust")
+```
+From the filter method, There are a few columns that have been eliminated because of high such a high correlation:
+- Tax
+- Cogs
+_ Gross Income
+
+
+We should try another method and see what other features we will remain with 
+
+## wrapper method
+```{r}
+# Installing and loading our clustvarsel package
+suppressWarnings(
+        suppressMessages(if
+                         (!require(clustvarsel, quietly=TRUE))
+                install.packages("clustvarsel")))
+                         
+library(clustvarsel)
+# Installing and loading our mclust package
+suppressWarnings(
+        suppressMessages(if
+                         (!require(mclust, quietly=TRUE))
+                install.packages("mclust")))
+library(mclust)
+```
+
+```{r}
+# Sequential forward greedy search (default)
+#
+out = clustvarsel(df_low, G = 1:5)
+out
+```
+For the wrapper method only a few columns have been selected for modelling. these are:
+- Total
+- Quantity
+- Unit Price
+
+## Embended methods
+```{r}
+suppressWarnings(
+        suppressMessages(if
+                         (!require(wskm, quietly=TRUE))
+                install.packages("wskm")))
+library(wskm)
+set.seed(2)
+model <- ewkm(df_low, 3, lambda=2, maxiter=1000)
+```
+
+```{r}
+suppressWarnings(
+        suppressMessages(if
+                         (!require(cluster, quietly=TRUE))
+                install.packages("cluster")))
+library("cluster")
+clusplot(df_low, model$cluster, color=TRUE, cor = TRUE, shade=TRUE,
+         labels=2, lines=1,main='Cluster Analysis for df')
+```
+
+
+```{r}
+# Weights are calculated for each variable and cluster. 
+# They are a measure of the relative importance of each variable 
+# with regards to the membership of the observations to that cluster. 
+# The weights are incorporated into the distance function, 
+# typically reducing the distance for more important variables.
+# Weights remain stored in the model and we can check them as follows:
+# 
+round(model$weights*100,2)
+```
+
