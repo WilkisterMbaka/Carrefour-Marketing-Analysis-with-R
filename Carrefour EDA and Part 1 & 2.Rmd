@@ -187,7 +187,9 @@ The information collected was half from the members and half from the normal cus
 # Frequency of Gender column
 
 ggplot(df, aes(x = gender)) +
-  geom_bar(fill="blue") +  ggtitle('Barplot of Gender')
+  geom_bar(fill="blue") +  ggtitle('Barplot of Gender') 
+
+
 ```
 The data from male and female persons is equal
 
@@ -597,12 +599,18 @@ library(mclust)
 out = clustvarsel(df_low, G = 1:5)
 out
 ```
+```{r}
+# Check the selected columns
+Subset1 = df[,out$subset]
+head(Subset1)
+```
 For the wrapper method only a few columns have been selected for modelling. these are:
 - Total
 - Quantity
 - Unit Price
+- Rating
 
-## Embended methods
+## Embedded methods
 ```{r}
 suppressWarnings(
         suppressMessages(if
@@ -634,4 +642,5 @@ clusplot(df_low, model$cluster, color=TRUE, cor = TRUE, shade=TRUE,
 # 
 round(model$weights*100,2)
 ```
+
 
