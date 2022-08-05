@@ -271,40 +271,52 @@ ggplot(anom, aes(x=Date, y=Sales, color=Sales)) + geom_line()
 
 First lets convert the df to a different format. 
 ```{r}
-# sort the table in ascending order of 'date'
-anom  = anom[order(anom$Date),]  
-
-# convert dataset to tibble
-anomX <- as_tbl_time(anom, Date)
-class(anomX)
-plot (anomX)
+# # sort the table in ascending order of 'date'
+# anom  = anom[order(anom$Date),]  
+# 
+# # convert dataset to tibble
+# anomX <- as_tbl_time(anom, Date)
+# class(anomX)
+# plot (anomX)
 ```
 
 ```{r}
 # install.packages("devtools")
 # devtools::install_github("twitter/AnomalyDetection")
-library(AnomalyDetection)
+# library(AnomalyDetection)
 ```
 
 ```{r}
-sales_an <- AnomalyDetectionVec (x = anomX$Sales,period = 3 , direction= "both", plot = TRUE)
-sales_an
+# Convert the data into Tibble and  Convert to a Tibble, message=TRUE
+sales_ts = anom %>%
+  as_tibble() %>%
+  as_tbl_time(Date) %>%
+  arrange(Date) %>%
+  as_period("daily")
 ```
 
+
+```{r Anomaly Detection}
+library(anomalize)
+sales_anomaly <- sales_ts %>%
+  time_decompose(Sales) %>% 
+  anomalize(remainder,max_anoms = 0.2, alpha=0.05) %>%
+  time_recompose() %>% glimpse()
+# Plot
+sales_anomaly %>% plot_anomalies(time_recomposed = TRUE)
+#sales_anomaly %>% plot_anomaly_decomposition(time_recompose = T)
+```
+There is are no Anomalies in our Sales Data 
 
 
 ```{r}
-# Anomalize 
-# anomX %>%
-#    time_decompose(dates) %>%
-#    anomalize(remainder) %>%
-#    time_recompose() %>%
-#    plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.5)
+# Checking for trend 
+sales_ts %>%
+  time_decompose(Sales, method = "stl",  frequency = "auto", trend = "auto") %>%  
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.1) %>% 
+  plot_anomaly_decomposition()
 ```
+There are no anomalies in our data set
 
-
-# Conclusions
-The data provided was accurate and more than sufficient to perform all the analysis that was initially intended for the project. 
-The marketing team will find insight and leads on various topics such as:
-- product distribution.
-- marketing strategies and much more
+# Conclusion
+There are no anomalies in our data
